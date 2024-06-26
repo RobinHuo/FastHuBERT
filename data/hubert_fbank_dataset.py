@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import logging
+import os
 import sys
 import torch
 import numpy as np
@@ -103,18 +104,18 @@ class FastHubertDataset(HubertDataset):
         )
         
         # global cmvn
-        stats = np.load(stats_npz_path, allow_pickle=True).tolist()
+        stats = np.load(stats_npz_path, allow_pickle=True)
         self.mean, self.std = stats["mean"], stats["std"] 
 
     def get_fbank(self, index):  
-        wav_path = self.audio_names[index]
+        wav_path = os.path.join(self.audio_root, self.audio_names[index])
         fbank = np.load(wav_path, allow_pickle=True) 
         fbank = torch.from_numpy(fbank).float() 
 
         fbank = np.subtract(fbank, self.mean) 
         fbank = np.divide(fbank, self.std) 
 
-        return fbank
+        return fbank.float()
 
     def __getitem__(self, index):
         wav = self.get_fbank(index) 
