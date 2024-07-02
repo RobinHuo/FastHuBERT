@@ -179,7 +179,7 @@ class FastHubertDataset(HubertDataset):
                 offset=ofs,
             )
             self.mmap.madvise(
-                mmap.MADV_DONTNEED, start=ofs // mmap.PAGESIZE, length=fbank.nbytes
+                mmap.MADV_DONTNEED, start=(ofs // mmap.PAGESIZE) * mmap.PAGESIZE, length=fbank.nbytes
             )
         else:
             wav_path = os.path.join(self.audio_root, self.audio_names[index])
