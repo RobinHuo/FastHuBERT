@@ -14,6 +14,37 @@ from fairseq.data.audio.hubert_dataset import load_label,load_label_offset,verif
 
 logger = logging.getLogger(__name__)
 
+
+def load_fbank_file(manifest_path, max_keep, min_keep):
+    n_long, n_short = 0, 0
+    names, inds, sizes = [], [], []
+    offsets = []
+    with open(manifest_path) as f:
+        root = f.readline().strip()  
+        for ind, line in enumerate(f):  
+            items = line.strip().split("\t") 
+            sz = int(items[2])   
+            offset = int(items[3])
+            if min_keep is not None and sz < min_keep: 
+                n_short += 1
+            elif max_keep is not None and sz > max_keep:
+                n_long += 1
+            else:
+                names.append(items[1])
+                inds.append(ind)
+                sizes.append(sz)
+                offsets.append(offset)
+    tot = ind + 1   
+    logger.info(
+        (
+            f"max_keep={max_keep}, min_keep={min_keep}, "
+            f"loaded {len(names)}, skipped {n_short} short and {n_long} long, "
+            f"longest-loaded={max(sizes)}, shortest-loaded={min(sizes)}"
+        )
+    ) 
+    return root, names, inds, tot, sizes, offsets
+
+
 def load_fbank(manifest_path, max_keep, min_keep):
     n_long, n_short = 0, 0
     names, inds, sizes = [], [], []
@@ -62,9 +93,16 @@ class FastHubertDataset(HubertDataset):
         random_crop: bool = False,
         single_target: bool = False,
     ):
-        self.audio_root, self.audio_names, inds, tot, self.sizes = load_fbank(  
-            manifest_path, max_keep_sample_size, min_keep_sample_size
-        ) 
+        if os.getenv("ONEFILE"):
+            self.audio_root, self.audio_names, inds, tot, self.sizes, self.offsets = load_fbank_file(
+                manifest_path, max_keep_sample_size, min_keep_sample_size
+            )
+            self.feats = np.load(self.audio_root, mmap_mode="r")
+        else:
+            self.feats = self.offsets = None
+            self.audio_root, self.audio_names, inds, tot, self.sizes = load_fbank(  
+                manifest_path, max_keep_sample_size, min_keep_sample_size
+            ) 
         self.sample_rate = sample_rate
         self.shuffle = shuffle
         self.random_crop = random_crop
@@ -108,8 +146,13 @@ class FastHubertDataset(HubertDataset):
         self.mean, self.std = stats["mean"], stats["std"] 
 
     def get_fbank(self, index):  
-        wav_path = os.path.join(self.audio_root, self.audio_names[index])
-        fbank = np.load(wav_path, allow_pickle=True) 
+        if self.feats is not None:
+            offset = self.offsets[index]
+            fbank = np.zeros((self.sizes[index], 80), dtype=self.feats.dtype)
+            fbank[:] = self.feats[offset : offset + self.sizes[index]]
+        else:
+            wav_path = os.path.join(self.audio_root, self.audio_names[index])
+            fbank = np.load(wav_path, allow_pickle=True) 
         fbank = torch.from_numpy(fbank).float() 
 
         fbank = np.subtract(fbank, self.mean) 
