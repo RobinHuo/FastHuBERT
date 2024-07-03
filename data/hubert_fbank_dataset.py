@@ -107,18 +107,18 @@ class FastHubertDataset(HubertDataset):
                 )
             )
             # self.feats = np.load(self.audio_root, mmap_mode="r")
-            fp = open(self.audio_root, "rb")
-            # weakref.finalize(self, fp.close)
-            ver, _ = np.lib.format.read_magic(fp)
+            self.fp = open(self.audio_root, "rb")
+            # weakref.finalize(self, self.fp.close)
+            ver, _ = np.lib.format.read_magic(self.fp)
             if ver == 1:
                 read_fn = np.lib.format.read_array_header_1_0
             else:
                 read_fn = np.lib.format.read_array_header_2_0
-            self.shape, _, self.dtype = read_fn(fp, max_header_size=32768)
+            self.shape, _, self.dtype = read_fn(self.fp, max_header_size=32768)
             self.itemsize = np.dtype(self.dtype).itemsize
-            self.start_ofs = fp.tell()
-            fp.seek(0)
-            self.mmap = mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ)
+            self.start_ofs = self.fp.tell()
+            self.fp.seek(0)
+            self.mmap = mmap.mmap(self.fp.fileno(), 0, access=mmap.ACCESS_READ)
             weakref.finalize(self, self.mmap.close)
         else:
             self.idxs = None
