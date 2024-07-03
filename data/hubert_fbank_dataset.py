@@ -4,7 +4,6 @@
 # LICENSE file in the root directory of this source tree.
 
 import logging
-import mmap
 import os
 import sys
 import weakref
@@ -106,11 +105,11 @@ class FastHubertDataset(HubertDataset):
                     manifest_path, max_keep_sample_size, min_keep_sample_size
                 )
             )
-            # self.feats = np.load(self.audio_root, mmap_mode="r")
-            fp = open(self.audio_root, "rb")
-            weakref.finalize(self, fp.close)
-            self.fd = fp.fileno()
+            self.fd = os.open(self.audio_root, flags=os.O_RDONLY)
+            weakref.finalize(self, os.close, self.fd)
             os.set_inheritable(self.fd, True)
+
+            fp = os.fdopen(self.fd, mode="rb", closefd=False)
             ver, _ = np.lib.format.read_magic(fp)
             if ver == 1:
                 read_fn = np.lib.format.read_array_header_1_0
@@ -172,7 +171,7 @@ class FastHubertDataset(HubertDataset):
             idx = self.idxs[index]
             ofs = self.start_ofs + self.itemsize * idx * 80
             size = self.itemsize * self.sizes[index] * 80
-            fp = open(self.fd, "rb")
+            fp = os.fdopen(self.fd, mode="rb", closefd=False)
             fp.seek(ofs, 0)
             buf = bytearray(size)
             nbytes = fp.readinto(buf)
