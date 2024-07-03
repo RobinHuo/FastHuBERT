@@ -110,7 +110,6 @@ class FastHubertDataset(HubertDataset):
             self.fp = open(self.audio_root, "rb")
             weakref.finalize(self, self.fp.close)
             ver, _ = np.lib.format.read_magic(self.fp)
-            self.fp.seek(0)
             if ver == 2:
                 read_fn = np.lib.format.read_array_header_2_0
             else:
