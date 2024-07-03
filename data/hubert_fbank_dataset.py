@@ -78,9 +78,6 @@ def load_fbank(manifest_path, max_keep, min_keep):
     )
     return root, names, inds, tot, sizes
 
-# terrible hack to make the dataset class pickleable
-_fps = {}
-_mmaps = {}
 
 class FastHubertDataset(HubertDataset):
     def __init__(
@@ -110,8 +107,8 @@ class FastHubertDataset(HubertDataset):
                 )
             )
             # self.feats = np.load(self.audio_root, mmap_mode="r")
-            fp = _fps[id(self)] = open(self.audio_root, "rb")
-            weakref.finalize(self, fp.close)
+            fp = open(self.audio_root, "rb")
+            # weakref.finalize(self, fp.close)
             ver, _ = np.lib.format.read_magic(fp)
             if ver == 1:
                 read_fn = np.lib.format.read_array_header_1_0
@@ -121,8 +118,8 @@ class FastHubertDataset(HubertDataset):
             self.itemsize = np.dtype(self.dtype).itemsize
             self.start_ofs = fp.tell()
             fp.seek(0)
-            _mmaps[id(self)] = mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ)
-            weakref.finalize(self, _mmaps[id(self)].close)
+            self.mmap = mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ)
+            weakref.finalize(self, self.mmap.close)
         else:
             self.idxs = None
             self.audio_root, self.audio_names, inds, tot, self.sizes = load_fbank(
@@ -177,10 +174,10 @@ class FastHubertDataset(HubertDataset):
             fbank = np.ndarray(
                 (self.sizes[index], 80),
                 dtype=self.dtype,
-                buffer=_mmaps[id(self)],
+                buffer=self.mmap,
                 offset=ofs,
             ).copy()
-            _mmaps[id(self)].madvise(
+            self.mmap.madvise(
                 mmap.MADV_DONTNEED, (ofs // mmap.PAGESIZE) * mmap.PAGESIZE, fbank.nbytes
             )
         else:
