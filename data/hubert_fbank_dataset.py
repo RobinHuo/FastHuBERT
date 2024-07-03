@@ -108,6 +108,7 @@ class FastHubertDataset(HubertDataset):
             self.fd = os.open(self.audio_root, flags=os.O_RDONLY)
             weakref.finalize(self, os.close, self.fd)
             os.set_inheritable(self.fd, True)
+            assert os.get_inheritable(self.fd)
 
             fp = os.fdopen(self.fd, mode="rb", closefd=False)
             ver, _ = np.lib.format.read_magic(fp)
