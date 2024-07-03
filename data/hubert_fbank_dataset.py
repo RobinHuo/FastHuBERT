@@ -122,7 +122,7 @@ class FastHubertDataset(HubertDataset):
             self.start_ofs = fp.tell()
             fp.seek(0)
             _mmaps[id(self)] = mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ)
-            weakref.finalize(self, _mmaps[id(self)])
+            weakref.finalize(self, _mmaps[id(self)].close)
         else:
             self.idxs = None
             self.audio_root, self.audio_names, inds, tot, self.sizes = load_fbank(
