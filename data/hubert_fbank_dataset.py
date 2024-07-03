@@ -115,7 +115,7 @@ class FastHubertDataset(HubertDataset):
                 read_fn = np.lib.format.read_array_header_2_0
             else:
                 read_fn = np.lib.format.read_array_header_1_0
-            self.shape, _, self.dtype = read_fn(self.fp)
+            self.shape, _, self.dtype = read_fn(self.fp, max_header_size=32768)
             self.itemsize = np.dtype(self.dtype).itemsize
             self.start_ofs = self.fp.tell()
             self.fp.seek(0)
