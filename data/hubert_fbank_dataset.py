@@ -107,19 +107,19 @@ class FastHubertDataset(HubertDataset):
                 )
             )
             # self.feats = np.load(self.audio_root, mmap_mode="r")
-            self.fp = open(self.audio_root, "rb")
-            # weakref.finalize(self, self.fp.close)
-            ver, _ = np.lib.format.read_magic(self.fp)
+            fp = open(self.audio_root, "rb")
+            weakref.finalize(self, fp.close)
+            self.fd = fp.fileno()
+            os.set_inheritable(self.fd, True)
+            ver, _ = np.lib.format.read_magic(fp)
             if ver == 1:
                 read_fn = np.lib.format.read_array_header_1_0
             else:
                 read_fn = np.lib.format.read_array_header_2_0
-            self.shape, _, self.dtype = read_fn(self.fp, max_header_size=32768)
+            self.shape, _, self.dtype = read_fn(fp, max_header_size=32768)
             self.itemsize = np.dtype(self.dtype).itemsize
-            self.start_ofs = self.fp.tell()
-            self.fp.seek(0)
-            self.mmap = mmap.mmap(self.fp.fileno(), 0, access=mmap.ACCESS_READ)
-            weakref.finalize(self, self.mmap.close)
+            self.start_ofs = fp.tell()
+            fp.seek(0)
         else:
             self.idxs = None
             self.audio_root, self.audio_names, inds, tot, self.sizes = load_fbank(
@@ -171,15 +171,26 @@ class FastHubertDataset(HubertDataset):
         if self.idxs is not None:
             idx = self.idxs[index]
             ofs = self.start_ofs + self.itemsize * idx * 80
+            size = self.itemsize * self.sizes[index] * 80
+            fp = open(self.fd, "rb")
+            fp.seek(ofs, 0)
+            buf = bytearray(size)
+            nbytes = fp.readinto(buf)
+            assert nbytes == size
             fbank = np.ndarray(
                 (self.sizes[index], 80),
                 dtype=self.dtype,
-                buffer=self.mmap,
-                offset=ofs,
-            ).copy()
-            self.mmap.madvise(
-                mmap.MADV_DONTNEED, (ofs // mmap.PAGESIZE) * mmap.PAGESIZE, fbank.nbytes
+                buffer=buf,
             )
+            # fbank = np.ndarray(
+            #     (self.sizes[index], 80),
+            #     dtype=self.dtype,
+            #     buffer=self.mmap,
+            #     offset=ofs,
+            # ).copy()
+            # self.mmap.madvise(
+            #     mmap.MADV_DONTNEED, (ofs // mmap.PAGESIZE) * mmap.PAGESIZE, fbank.nbytes
+            # )
         else:
             wav_path = os.path.join(self.audio_root, self.audio_names[index])
             fbank = np.load(wav_path, allow_pickle=True)
