@@ -182,15 +182,6 @@ class FastHubertDataset(HubertDataset):
                 dtype=self.dtype,
                 buffer=buf,
             )
-            # fbank = np.ndarray(
-            #     (self.sizes[index], 80),
-            #     dtype=self.dtype,
-            #     buffer=self.mmap,
-            #     offset=ofs,
-            # ).copy()
-            # self.mmap.madvise(
-            #     mmap.MADV_DONTNEED, (ofs // mmap.PAGESIZE) * mmap.PAGESIZE, fbank.nbytes
-            # )
         else:
             wav_path = os.path.join(self.audio_root, self.audio_names[index])
             fbank = np.load(wav_path, allow_pickle=True)
