@@ -105,21 +105,16 @@ class FastHubertDataset(HubertDataset):
                     manifest_path, max_keep_sample_size, min_keep_sample_size
                 )
             )
-            self.fd = os.open(self.audio_root, flags=os.O_RDONLY)
-            weakref.finalize(self, os.close, self.fd)
-            os.set_inheritable(self.fd, True)
-            assert os.get_inheritable(self.fd)
-
-            fp = os.fdopen(self.fd, mode="rb", closefd=False)
-            ver, _ = np.lib.format.read_magic(fp)
-            if ver == 1:
-                read_fn = np.lib.format.read_array_header_1_0
-            else:
-                read_fn = np.lib.format.read_array_header_2_0
-            self.shape, _, self.dtype = read_fn(fp, max_header_size=32768)
-            self.itemsize = np.dtype(self.dtype).itemsize
-            self.start_ofs = fp.tell()
-            fp.seek(0)
+            with open(self.audio_root, "rb") as fp:
+                ver, _ = np.lib.format.read_magic(fp)
+                if ver == 1:
+                    read_fn = np.lib.format.read_array_header_1_0
+                else:
+                    read_fn = np.lib.format.read_array_header_2_0
+                self.shape, _, self.dtype = read_fn(fp, max_header_size=32768)
+                self.itemsize = np.dtype(self.dtype).itemsize
+                self.start_ofs = fp.tell()
+            self.fp = None
         else:
             self.idxs = None
             self.audio_root, self.audio_names, inds, tot, self.sizes = load_fbank(
@@ -169,13 +164,14 @@ class FastHubertDataset(HubertDataset):
 
     def get_fbank(self, index):
         if self.idxs is not None:
+            if self.fp is None:
+                self.fp = open(self.audio_root, "rb")
             idx = self.idxs[index]
             ofs = self.start_ofs + self.itemsize * idx * 80
             size = self.itemsize * self.sizes[index] * 80
-            fp = os.fdopen(self.fd, mode="rb", closefd=False)
-            fp.seek(ofs, 0)
+            self.fp.seek(ofs, 0)
             buf = bytearray(size)
-            nbytes = fp.readinto(buf)
+            nbytes = self.fp.readinto(buf)
             assert nbytes == size
             fbank = np.ndarray(
                 (self.sizes[index], 80),
