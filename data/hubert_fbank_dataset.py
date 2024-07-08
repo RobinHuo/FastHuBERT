@@ -21,6 +21,35 @@ from fairseq.data.audio.hubert_dataset import (
 logger = logging.getLogger(__name__)
 
 
+# taken from numpy: numpy/lib/format.py
+def _read_bytes(fp, size, error_template="ran out of data"):
+    """
+    Read from file-like object until size bytes are read.
+    Raises ValueError if not EOF is encountered before size bytes are read.
+    Non-blocking objects only supported if they derive from io objects.
+
+    Required as e.g. ZipExtFile in python 2.6 can return less data than
+    requested.
+    """
+    data = bytes()
+    while True:
+        # io files (default in python3) return None or raise on
+        # would-block, python2 file will truncate, probably nothing can be
+        # done about that.  note that regular files can't be non-blocking
+        try:
+            r = fp.read(size - len(data))
+            data += r
+            if len(r) == 0 or len(data) == size:
+                break
+        except BlockingIOError:
+            pass
+    if len(data) != size:
+        msg = "EOF: reading %s, expected %d bytes got %d"
+        raise ValueError(msg % (error_template, size, len(data)))
+    else:
+        return data
+
+
 def load_fbank_file(manifest_path, max_keep, min_keep):
     n_long, n_short = 0, 0
     names, inds, sizes = [], [], []
@@ -170,9 +199,7 @@ class FastHubertDataset(HubertDataset):
             ofs = self.start_ofs + self.itemsize * idx * 80
             size = self.itemsize * self.sizes[index] * 80
             self.fp.seek(ofs, 0)
-            buf = bytearray(size)
-            nbytes = self.fp.readinto(buf)
-            assert nbytes == size
+            buf = bytearray(_read_bytes(self.fp, size))
             fbank = np.ndarray(
                 (self.sizes[index], 80),
                 dtype=self.dtype,
