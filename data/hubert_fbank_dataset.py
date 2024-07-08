@@ -114,8 +114,14 @@ class FastHubertDataset(HubertDataset):
         stats = np.load(stats_npz_path, allow_pickle=True)
         self.mean, self.std = stats["mean"], stats["std"]
 
-    @cache
+        self.audios = [
+            np.load(os.path.join(self.audio_root, file), allow_pickle=True)
+            for file in self.audio_names
+        ]
+
     def _get_fbank_np(self, index):
+        if self.audios is not None:
+            return self.audios[index]
         wav_path = os.path.join(self.audio_root, self.audio_names[index])
         fbank = np.load(wav_path, allow_pickle=True)
         return fbank
