@@ -121,7 +121,7 @@ class FastHubertDataset(HubertDataset):
         return fbank
 
     def get_fbank(self, index):
-        fbank = torch.from_numpy(self._get_fbank_np(index)).float()
+        fbank = torch.from_numpy(self._get_fbank_np(index).copy()).float()
 
         fbank = np.subtract(fbank, self.mean)
         fbank = np.divide(fbank, self.std)
