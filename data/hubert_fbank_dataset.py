@@ -143,7 +143,7 @@ class FastHubertDataset(HubertDataset):
                 self.shape, _, self.dtype = read_fn(fp, max_header_size=32768)
                 self.itemsize = np.dtype(self.dtype).itemsize
                 self.start_ofs = fp.tell()
-            self.fp = None
+            self.fd = None
         else:
             self.idxs = None
             self.audio_root, self.audio_names, inds, tot, self.sizes = load_fbank(
@@ -193,13 +193,19 @@ class FastHubertDataset(HubertDataset):
 
     def get_fbank(self, index):
         if self.idxs is not None:
-            if self.fp is None:
-                self.fp = open(self.audio_root, "rb")
+            if self.fd is None:
+                self.fd = os.open(self.audio_root, os.O_RDONLY)
+            try:
+                fp = os.fdopen(self.fd, "rb", closefd=False)
+            except OSError:
+                # try to reopen the file
+                self.fd = os.open(self.audio_root, os.O_RDONLY)
+                fp = os.fdopen(self.fd, "rb", closefd=False)
             idx = self.idxs[index]
             ofs = self.start_ofs + self.itemsize * idx * 80
             size = self.itemsize * self.sizes[index] * 80
-            self.fp.seek(ofs, 0)
-            buf = bytearray(_read_bytes(self.fp, size))
+            fp.seek(ofs, 0)
+            buf = bytearray(_read_bytes(fp, size))
             fbank = np.ndarray(
                 (self.sizes[index], 80),
                 dtype=self.dtype,
