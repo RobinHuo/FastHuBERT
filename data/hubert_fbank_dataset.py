@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+from functools import cache
 import logging
 import os
 import sys
@@ -113,10 +114,14 @@ class FastHubertDataset(HubertDataset):
         stats = np.load(stats_npz_path, allow_pickle=True)
         self.mean, self.std = stats["mean"], stats["std"]
 
-    def get_fbank(self, index):
+    @cache
+    def _get_fbank_np(self, index):
         wav_path = os.path.join(self.audio_root, self.audio_names[index])
         fbank = np.load(wav_path, allow_pickle=True)
-        fbank = torch.from_numpy(fbank).float()
+        return fbank
+
+    def get_fbank(self, index):
+        fbank = torch.from_numpy(self._get_fbank_np(index)).float()
 
         fbank = np.subtract(fbank, self.mean)
         fbank = np.divide(fbank, self.std)
