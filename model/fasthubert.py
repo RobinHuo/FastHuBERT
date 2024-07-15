@@ -214,6 +214,7 @@ class FastHubertModel(HubertModel):
                 "x": x,
                 "padding_mask": padding_mask,
                 "features": features,
+                "layer_results": layer_results,
             }
 
         if self.ils:
