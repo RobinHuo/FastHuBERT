@@ -92,6 +92,8 @@ class FastHubertModel(HubertModel):
         super().__init__(cfg, task_cfg, dictionaries)
         logger.info(f"FastHubertModelConfig: {cfg}")
 
+        self.cfg = cfg
+
         self.embed = cfg.fbank_encoder_dim
         self.feat2tar_ratio = 2 ** (len(cfg.conv_kernel_sizes.split(",")) - 1)
         self.post_extract_proj = (
